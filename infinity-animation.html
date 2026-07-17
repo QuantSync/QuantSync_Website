@@ -11,142 +11,166 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
   }
   canvas { display: block; }
+  #fallback {
+    color: #ff6b6b;
+    font-family: monospace;
+    font-size: 14px;
+    display: none;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
 <canvas id="c" width="680" height="460"></canvas>
+<div id="fallback">Canvas 2D is not available in this browser/viewer.<br/>Open this file directly in Chrome, Firefox, or Edge.</div>
+
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const cx = 340, cy = 230;
-const A = 220, B = 130;
-const color = { h: 142, s: 71, l: 45 }; // #22C55E-ish base hue
-
-function lissajous(t, yShift) {
-  return {
-    x: cx + A * Math.sin(t),
-    y: cy + B * Math.sin(2 * t + yShift),
-  };
-}
-
-function hsl(h, s, l, a) {
-  return `hsla(${h % 360},${s}%,${l}%,${a})`;
-}
-
-function drawTrailLayer(phase, baseYShift, opts) {
-  const { trailCount, baseOpacity, strokeWidth, blur, hueShift, decay } = opts;
-  const resolution = 160;
-  for (let i = 0; i < trailCount; i++) {
-    const ratio = i / trailCount;
-    const yShift = baseYShift + ratio * 0.18 * Math.sin(phase);
-    const h = color.h + hueShift * ratio * 60;
-    const l = color.l + ratio * 20;
-    const op = baseOpacity * Math.pow(decay, i);
-
-    ctx.beginPath();
-    for (let j = 0; j <= resolution; j++) {
-      const t = (j / resolution) * Math.PI * 2;
-      const p = lissajous(t, yShift);
-      j === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
-    }
-    ctx.strokeStyle = hsl(h, color.s, Math.min(l, 90), op);
-    ctx.lineWidth = strokeWidth * (1 - ratio * 0.5);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.filter = blur ? `blur(${blur * (1 - ratio * 0.4)}px)` : 'none';
-    ctx.stroke();
+(function () {
+  var canvas = document.getElementById('c');
+  var ctx = null;
+  try {
+    ctx = canvas.getContext('2d');
+  } catch (e) {
+    ctx = null;
   }
-  ctx.filter = 'none';
-}
-
-function drawSpine(baseYShift) {
-  const resolution = 200;
-  ctx.beginPath();
-  for (let j = 0; j <= resolution; j++) {
-    const t = (j / resolution) * Math.PI * 2;
-    const p = lissajous(t, baseYShift);
-    j === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+  if (!ctx) {
+    canvas.style.display = 'none';
+    document.getElementById('fallback').style.display = 'block';
+    return;
   }
-  ctx.filter = 'blur(8px)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 4.5;
-  ctx.stroke();
-  ctx.filter = 'none';
-  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
-}
 
-function drawDepthRing(phase) {
-  const pulse = Math.sin(phase * 2) * 0.5 + 0.5;
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, A * 0.22);
-  grad.addColorStop(0, `rgba(0,0,0,${0.45 * pulse})`);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, A * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-}
+  var cx = 340, cy = 230;
+  var A = 220, B = 130;
+  var color = { h: 142, s: 71, l: 45 };
 
-function drawComets(baseYShift, progress, count, speed, colorOverride) {
-  for (let p = 0; p < count; p++) {
-    const t = ((progress * Math.PI * 4 * speed) - p * 0.18) % (Math.PI * 2);
-    const pos = lissajous(t, baseYShift);
-    const isHead = p === 0;
-    const op = Math.max(0, 1 - p / count);
-    const col = colorOverride || 'rgba(255,255,255,';
+  function lissajous(t, yShift) {
+    return {
+      x: cx + A * Math.sin(t),
+      y: cy + B * Math.sin(2 * t + yShift)
+    };
+  }
 
-    ctx.beginPath();
-    ctx.filter = `blur(${isHead ? 9 : 5}px)`;
-    ctx.fillStyle = col + (op * 0.35) + ')';
-    ctx.arc(pos.x, pos.y, isHead ? 7 : 3.5 - p * 0.5, 0, Math.PI * 2);
-    ctx.fill();
+  function hsl(h, s, l, a) {
+    return 'hsla(' + (h % 360) + ',' + s + '%,' + l + '%,' + a + ')';
+  }
 
-    ctx.filter = 'none';
-    ctx.beginPath();
-    ctx.fillStyle = col + (op * 0.9) + ')';
-    ctx.arc(pos.x, pos.y, isHead ? 3 : 1.8 - p * 0.3, 0, Math.PI * 2);
-    ctx.fill();
+  // Cheaper glow: shadowBlur/shadowColor instead of per-shape ctx.filter blur.
+  // Far less CPU cost per frame, and supported in effectively every canvas
+  // implementation (ctx.filter is a newer API some embedded webviews skip).
+  function drawTrailLayer(baseYShift, opts) {
+    var trailCount = opts.trailCount, baseOpacity = opts.baseOpacity,
+        strokeWidth = opts.strokeWidth, glow = opts.glow,
+        hueShift = opts.hueShift, decay = opts.decay;
+    var resolution = 90;
 
-    if (isHead) {
+    for (var i = 0; i < trailCount; i++) {
+      var ratio = i / trailCount;
+      var yShift = baseYShift + ratio * 0.15;
+      var h = color.h + hueShift * ratio * 60;
+      var l = Math.min(color.l + ratio * 20, 88);
+      var op = baseOpacity * Math.pow(decay, i);
+
       ctx.beginPath();
-      ctx.fillStyle = '#fff';
-      ctx.arc(pos.x - 1.2, pos.y - 1.2, 0.9, 0, Math.PI * 2);
+      for (var j = 0; j <= resolution; j++) {
+        var t = (j / resolution) * Math.PI * 2;
+        var p = lissajous(t, yShift);
+        if (j === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.strokeStyle = hsl(h, color.s, l, op);
+      ctx.lineWidth = strokeWidth * (1 - ratio * 0.5);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowBlur = glow;
+      ctx.shadowColor = hsl(h, color.s, l, op);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawSpine(baseYShift) {
+    var resolution = 120;
+    ctx.beginPath();
+    for (var j = 0; j <= resolution; j++) {
+      var t = (j / resolution) * Math.PI * 2;
+      var p = lissajous(t, baseYShift);
+      if (j === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawDepthRing(phase) {
+    var pulse = Math.sin(phase * 2) * 0.5 + 0.5;
+    var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, A * 0.22);
+    grad.addColorStop(0, 'rgba(0,0,0,' + (0.45 * pulse) + ')');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, A * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawComets(baseYShift, progress, count, speed, colorOverride) {
+    for (var p = 0; p < count; p++) {
+      var t = ((progress * Math.PI * 4 * speed) - p * 0.18) % (Math.PI * 2);
+      var pos = lissajous(t, baseYShift);
+      var isHead = p === 0;
+      var op = Math.max(0, 1 - p / count);
+      var col = colorOverride || 'rgba(255,255,255,';
+
+      ctx.shadowBlur = isHead ? 14 : 8;
+      ctx.shadowColor = col + (op * 0.6) + ')';
+      ctx.beginPath();
+      ctx.fillStyle = col + (op * 0.85) + ')';
+      ctx.arc(pos.x, pos.y, isHead ? 3.2 : 1.9 - p * 0.3, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (isHead) {
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.arc(pos.x - 1.2, pos.y - 1.2, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
-}
 
-let start = null;
-const durationMs = 6000;
+  var start = null;
+  var durationMs = 6000;
 
-function frame(ts) {
-  if (!start) start = ts;
-  const progress = ((ts - start) % durationMs) / durationMs;
-  const phase = progress * Math.PI * 2;
-  const baseYShift = Math.sin(phase) * Math.PI / 1.5;
+  function frame(ts) {
+    if (!start) start = ts;
+    var progress = ((ts - start) % durationMs) / durationMs;
+    var phase = progress * Math.PI * 2;
+    var baseYShift = Math.sin(phase) * (Math.PI / 1.5);
 
-  ctx.clearRect(0, 0, 680, 460);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(Math.sin(phase) * 0.12);
-  ctx.translate(-cx, -cy);
+    ctx.clearRect(0, 0, 680, 460);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.sin(phase) * 0.12);
+    ctx.translate(-cx, -cy);
 
-  drawTrailLayer(phase, baseYShift, { trailCount: 6, baseOpacity: 0.08, strokeWidth: 14, blur: 22, hueShift: 0, decay: 0.6 });
-  drawTrailLayer(phase, baseYShift, { trailCount: 10, baseOpacity: 0.18, strokeWidth: 7, blur: 10, hueShift: 0.3, decay: 0.75 });
-  drawTrailLayer(phase, baseYShift, { trailCount: 12, baseOpacity: 0.72, strokeWidth: 3.2, blur: 2.5, hueShift: 0.7, decay: 0.82 });
-  drawSpine(baseYShift);
-  drawDepthRing(phase);
-  drawComets(baseYShift, progress, 5, 1.0);
-  drawComets(baseYShift + Math.PI, progress, 3, 1.35, 'rgba(150,255,150,');
+    drawTrailLayer(baseYShift, { trailCount: 5, baseOpacity: 0.10, strokeWidth: 12, glow: 18, hueShift: 0, decay: 0.6 });
+    drawTrailLayer(baseYShift, { trailCount: 7, baseOpacity: 0.22, strokeWidth: 6, glow: 8, hueShift: 0.3, decay: 0.75 });
+    drawTrailLayer(baseYShift, { trailCount: 8, baseOpacity: 0.75, strokeWidth: 3, glow: 2, hueShift: 0.7, decay: 0.82 });
+    drawSpine(baseYShift);
+    drawDepthRing(phase);
+    drawComets(baseYShift, progress, 5, 1.0);
+    drawComets(baseYShift + Math.PI, progress, 3, 1.35, 'rgba(150,255,150,');
 
-  ctx.restore();
-  requestAnimationFrame(frame);
-}
+    ctx.restore();
+    window.requestAnimationFrame(frame);
+  }
 
-requestAnimationFrame(frame);
+  window.requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
