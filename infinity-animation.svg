@@ -31,7 +31,7 @@
 }
 @keyframes comet1{ from{stroke-dashoffset:0;} to{stroke-dashoffset:-1640;} }
 @keyframes comet2{ from{stroke-dashoffset:0;} to{stroke-dashoffset:1600;} }
-.wobble{ transform-origin:340px 200px; animation:wobble 6s ease-in-out infinite; }
+.wobble{ transform-origin:340px 230px; animation:wobble 6s ease-in-out infinite; }
 .depth{ animation:depthPulse 3s ease-in-out infinite; }
 .comet1{ stroke-dasharray:46 1600; animation:comet1 3.2s linear infinite; }
 .comet2{ stroke-dasharray:22 1618; animation:comet2 4.6s linear infinite; }
@@ -40,23 +40,18 @@
 <rect x="0" y="0" width="680" height="460" fill="#050505"/>
 
 <g class="wobble">
-  <!-- depth shading at the crossing point, sells an over/under weave -->
-  <circle class="depth" cx="340" cy="200" r="34" fill="url(#depthGrad)"/>
+  <circle class="depth" cx="340" cy="230" r="34" fill="url(#depthGrad)"/>
 
-  <!-- faint ambient full loop -->
-  <path d="M340,200 C270,90 190,90 190,200 C190,310 270,310 340,200 C410,90 490,90 490,200 C490,310 410,310 340,200"
+  <path d="M340,230 C270,120 190,120 190,230 C190,340 270,340 340,230 C410,120 490,120 490,230 C490,340 410,340 340,230"
     fill="none" stroke="url(#ribbonGrad)" stroke-width="10" stroke-linecap="round" opacity="0.16" filter="url(#glowSoft)"/>
 
-  <!-- crisp core ribbon -->
-  <path d="M340,200 C270,90 190,90 190,200 C190,310 270,310 340,200 C410,90 490,90 490,200 C490,310 410,310 340,200"
+  <path d="M340,230 C270,120 190,120 190,230 C190,340 270,340 340,230 C410,120 490,120 490,230 C490,340 410,340 340,230"
     fill="none" stroke="url(#ribbonGrad)" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
 
-  <!-- bright travelling comet, primary direction -->
-  <path class="comet1" d="M340,200 C270,90 190,90 190,200 C190,310 270,310 340,200 C410,90 490,90 490,200 C490,310 410,310 340,200"
+  <path class="comet1" d="M340,230 C270,120 190,120 190,230 C190,340 270,340 340,230 C410,120 490,120 490,230 C490,340 410,340 340,230"
     fill="none" stroke="#EFFFF4" stroke-width="6" stroke-linecap="round" filter="url(#glowStrong)"/>
 
-  <!-- secondary lighter comet, opposite direction, thinner -->
-  <path class="comet2" d="M340,200 C270,90 190,90 190,200 C190,310 270,310 340,200 C410,90 490,90 490,200 C490,310 410,310 340,200"
+  <path class="comet2" d="M340,230 C270,120 190,120 190,230 C190,340 270,340 340,230 C410,120 490,120 490,230 C490,340 410,340 340,230"
     fill="none" stroke="#B9FFCF" stroke-width="3" stroke-linecap="round" opacity="0.85" filter="url(#glowSoft)"/>
 </g>
 </svg>
